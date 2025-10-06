@@ -1,0 +1,1611 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Distributed Online Exam System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        primary: {
+                            50: '#eff6ff',
+                            100: '#dbeafe',
+                            500: '#3b82f6',
+                            600: '#2563eb',
+                            700: '#1d4ed8'
+                        },
+                        secondary: {
+                            50: '#ecfdf5',
+                            100: '#d1fae5',
+                            500: '#10b981',
+                            600: '#059669',
+                            700: '#047857'
+                        },
+                        accent: {
+                            50: '#fffbeb',
+                            100: '#fef3c7',
+                            500: '#f59e0b',
+                            600: '#d97706',
+                            700: '#b45309'
+                        },
+                        dark: {
+                            50: '#f9fafb',
+                            100: '#f3f4f6',
+                            200: '#e5e7eb',
+                            300: '#d1d5db',
+                            400: '#9ca3af',
+                            500: '#6b7280',
+                            600: '#4b5563',
+                            700: '#374151',
+                            800: '#1f2937',
+                            900: '#111827'
+                        }
+                    },
+                    fontFamily: {
+                        'sans': ['Inter', 'system-ui', 'sans-serif'],
+                    },
+                    boxShadow: {
+                        'soft': '0 2px 15px -3px rgba(0, 0, 0, 0.07), 0 10px 20px -2px rgba(0, 0, 0, 0.04)',
+                        'dark': '0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -1px rgba(0, 0, 0, 0.2)',
+                    }
+                }
+            }
+        }
+    </script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <!-- Font Awesome Free CSS via Cloudflare CDN -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        integrity="sha512-4LL0u1qkLJqCq4rX0DgV0U4sAQ6GfhxZ14+4dB0iB3fTxk1Y1pZ1J0qV1BFFcJTSfQxXl0YVr6n3H7ePfjxJkg=="
+        crossorigin="anonymous" referrerpolicy="no-referrer" />
+
+    <style>
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+
+        .dark-mode {
+            background-color: #111827;
+            color: #f9fafb;
+        }
+
+        .tab-content {
+            display: none;
+        }
+
+        .tab-content.active {
+            display: block;
+            animation: fadeIn 0.3s ease-in-out;
+        }
+
+        @keyframes fadeIn {
+            from {
+                opacity: 0;
+            }
+
+            to {
+                opacity: 1;
+            }
+        }
+
+        .editable-cell {
+            min-width: 80px;
+            padding: 4px 8px;
+            border: 1px solid transparent;
+            border-radius: 4px;
+            transition: all 0.2s;
+        }
+
+        .editable-cell:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+            border-color: #4b5563;
+        }
+
+        .editable-cell.editing {
+            background-color: rgba(245, 158, 11, 0.2);
+            border-color: #f59e0b;
+        }
+
+        .timer {
+            font-family: 'Courier New', monospace;
+            font-weight: bold;
+            color: #ef4444;
+        }
+
+        .log-container {
+            max-height: 400px;
+            overflow-y: auto;
+            font-family: 'Courier New', monospace;
+            font-size: 12px;
+        }
+
+        .log-line {
+            padding: 2px 8px;
+            margin: 1px 0;
+        }
+
+        .log-line:hover {
+            background-color: rgba(255, 255, 255, 0.05);
+        }
+
+        .connection-indicator {
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            display: inline-block;
+            margin-right: 8px;
+        }
+
+        .connected {
+            background-color: #10B981;
+        }
+
+        .disconnected {
+            background-color: #EF4444;
+        }
+
+        .connecting {
+            background-color: #F59E0B;
+            animation: pulse 1s infinite;
+        }
+
+        @keyframes pulse {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .score-display {
+            font-size: 2rem;
+            font-weight: bold;
+            color: #10b981;
+        }
+
+        .card {
+            @apply bg-white dark:bg-dark-800 rounded-xl shadow-soft dark:shadow-dark border border-gray-200 dark:border-dark-700 overflow-hidden;
+        }
+
+        .btn-primary {
+            @apply bg-primary-600 hover:bg-primary-700 focus:ring-primary-500 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-dark-900;
+        }
+
+        .btn-secondary {
+            @apply bg-secondary-600 hover:bg-secondary-700 focus:ring-secondary-500 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-dark-900;
+        }
+
+        .btn-accent {
+            @apply bg-accent-600 hover:bg-accent-700 focus:ring-accent-500 text-white font-medium py-2.5 px-4 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 dark:focus:ring-offset-dark-900;
+        }
+
+        .btn-outline {
+            @apply bg-white dark:bg-dark-700 hover:bg-gray-50 dark:hover:bg-dark-600 border border-gray-300 dark:border-dark-600 text-gray-700 dark:text-gray-300 font-medium py-2.5 px-4 rounded-lg transition-all duration-200 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary-500 dark:focus:ring-offset-dark-900;
+        }
+
+        .form-input {
+            @apply block w-full rounded-lg border-gray-300 dark:border-dark-600 bg-white dark:bg-dark-700 text-gray-900 dark:text-white shadow-sm focus:border-primary-500 focus:ring-primary-500 dark:focus:border-primary-500 dark:focus:ring-primary-500;
+        }
+
+        .tab-button {
+            @apply py-4 px-1 border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300 hover:border-gray-300 dark:hover:border-dark-600 font-medium text-sm transition-all duration-200;
+        }
+
+        .tab-button.active {
+            @apply text-primary-600 dark:text-primary-500 border-primary-600 dark:border-primary-500;
+        }
+
+        .status-badge {
+            @apply px-2.5 py-0.5 inline-flex text-xs leading-5 font-semibold rounded-full;
+        }
+
+        .status-active {
+            @apply bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200;
+        }
+
+        .status-submitted {
+            @apply bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200;
+        }
+
+        .status-terminated {
+            @apply bg-red-100 dark:bg-red-900 text-red-800 dark:text-red-200;
+        }
+
+        .question-card {
+            @apply bg-gray-50 dark:bg-dark-700 rounded-xl p-6 border border-gray-200 dark:border-dark-600 transition-all duration-200;
+        }
+
+        .question-card:hover {
+            @apply border-primary-200 dark:border-primary-800 shadow-sm dark:shadow-none;
+        }
+
+        .metric-card {
+            @apply bg-white dark:bg-dark-800 overflow-hidden shadow-soft dark:shadow-dark rounded-xl border border-gray-100 dark:border-dark-700;
+        }
+
+        .theme-toggle {
+            @apply p-2 rounded-lg bg-gray-100 dark:bg-dark-700 hover:bg-gray-200 dark:hover:bg-dark-600 text-gray-700 dark:text-gray-300 transition-colors duration-200;
+        }
+
+        #background_001 {
+            background-image: url('bg.jpg');
+            background-size: 150px 150px;
+            background-position: center;
+            background-repeat: no-repeat;
+        }
+
+        @keyframes gradientShift {
+            0% {
+                background-position: 0% 50%;
+            }
+
+            50% {
+                background-position: 100% 50%;
+            }
+
+            100% {
+                background-position: 0% 50%;
+            }
+        }
+    </style>
+</head>
+<!-- background: linear-gradient(-45deg, #043260, #0a193a, #0331a8, #050017);
+            background-size: 400% 400%;
+            animation: gradientShift 15s ease infinite;
+            border-radius: 20px; -->
+
+<body id="background_001" class="bg-gray-50 dark:bg-dark-900 min-h-screen transition-colors duration-300">
+    <!-- Header -->
+    <header
+        class="bg-white dark:bg-dark-800 shadow-sm border-b border-gray-200 dark:border-dark-700 transition-colors duration-300">
+        <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex justify-between items-center py-4">
+                <div class="flex items-center">
+                    <div class="flex-shrink-0 mr-3">
+                        <svg class="w-8 h-8 text-primary-600 dark:text-primary-500" fill="none" stroke="currentColor"
+                            viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 14l9-5-9-5-9 5 9 5z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 14l9-5-9-5-9 5 9 5zm0 0l-9 5m9-5v6"></path>
+                        </svg>
+                    </div>
+                    <div>
+                        <h1 class="text-2xl font-bold text-gray-900 dark:text-white">Distributed Online Exam System</h1>
+                        <p class="text-sm text-gray-500 dark:text-gray-400">Secure and scalable examination platform</p>
+                    </div>
+                </div>
+                <div class="flex items-center space-x-4">
+                    <button id="themeToggle" class="theme-toggle">
+                        <svg id="sunIcon" class="w-5 h-5 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z">
+                            </path>
+                        </svg>
+                        <svg id="moonIcon" class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z">
+                            </path>
+                        </svg>
+                    </button>
+                    <span class="connection-indicator" id="connectionStatus"></span>
+                    <span id="connectionText" class="text-sm text-gray-600 dark:text-gray-400">Connecting...</span>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Tab Navigation -->
+    <!-- Tab Navigation -->
+    <nav class="bg-white dark:bg-dark-800 border-b border-gray-200 dark:border-dark-700 transition-colors duration-300">
+        <button id="btn_001"
+            class="flex items-center space-x-2 bg-blue-600 hover:bg-blue-500 px-4 py-2 rounded-lg transition-all duration-200">
+            <!-- <i class="fa-solid fa-bars"></i> -->
+            <span>Menu</span>
+        </button>
+        <div id="div_001" class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+            <div class="flex flex-wrap gap-4 justify-center py-4">
+                <button
+                    class="tab-button active text-white px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 transition-all"
+                    onclick="switchTab('student')">
+                    Student Portal
+                </button>
+                <button
+                    class="tab-button text-white px-5 py-2 rounded-xl bg-indigo-600 hover:bg-indigo-700 transition-all"
+                    onclick="switchTab('teacher')">
+                    Teacher Dashboard
+                </button>
+                <button
+                    class="tab-button text-white px-5 py-2 rounded-xl bg-purple-600 hover:bg-purple-700 transition-all"
+                    onclick="switchTab('admin')">
+                    Admin Monitor
+                </button>
+            </div>
+
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="max-w-7xl mx-auto py-10 sm:px-6 lg:px-8">
+
+        <!-- ==================== STUDENT TAB ==================== -->
+        <div id="student" class="tab-content">
+            <div id="studentLogin" class="max-w-md mx-auto mt-8 p-8 rounded-3xl shadow-2xl bg-gradient-to-b from-blue-50 to-white 
+        dark:from-gray-800 dark:to-gray-900 border border-blue-200 dark:border-gray-700 
+        transition transform hover:-translate-y-1 hover:shadow-blue-200/50">
+
+                <h2 class="text-2xl font-bold text-center text-blue-700 dark:text-blue-400 mb-8 tracking-wide">
+                    Student Login
+                </h2>
+
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Roll
+                            Number</label>
+                        <input type="text" id="studentRollNo" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl 
+              focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition-all 
+              bg-white dark:bg-gray-800 dark:text-white" placeholder="Enter your roll number">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Full Name</label>
+                        <input type="text" id="studentName" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl 
+              focus:ring-2 focus:ring-blue-400 focus:border-blue-400 outline-none transition-all 
+              bg-white dark:bg-gray-800 dark:text-white" placeholder="Enter your full name">
+                    </div>
+                </div>
+
+                <div class="mt-8">
+                    <button onclick="studentLogin()"
+                        class="w-full py-3 rounded-xl bg-blue-600 text-white font-semibold hover:bg-blue-700 transition-all shadow-md hover:shadow-lg">
+                        Start Exam
+                    </button>
+                </div>
+            </div>
+
+            <div id="examInterface" class="px-6 py-4" style="display: none;">
+                <div class="flex justify-between items-center mb-6">
+                    <h2 class="text-xl font-semibold text-gray-900">Exam in Progress</h2>
+                    <div class="flex items-center space-x-4">
+                        <span class="text-sm text-gray-600">Time Remaining:</span>
+                        <span id="examTimer" class="timer text-lg">--:--:--</span>
+                    </div>
+                </div>
+
+                <div id="questionsContainer" class="space-y-6">
+                    <!-- Questions will be loaded here -->
+                </div>
+
+                <div class="mt-8 flex justify-end space-x-4">
+                    <button onclick="submitExam()"
+                        class="px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-secondary hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary">
+                        Submit Exam
+                    </button>
+                </div>
+            </div>
+
+            <div id="examResults" class="px-6 py-4" style="display: none;">
+                <div class="text-center">
+                    <h2 class="text-xl font-semibold text-gray-900 mb-4">Exam Completed</h2>
+                    <div class="bg-green-50 border border-green-200 rounded-md p-6">
+                        <p class="text-lg text-green-800 mb-4">Your exam has been submitted successfully!</p>
+                        <div class="score-display" id="finalScore">Score: 0/100</div>
+                        <p class="text-sm text-green-600 mt-2" id="resultMessage">Thank you for participating in
+                            the exam.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== TEACHER TAB ==================== -->
+        <div id="teacher" class="tab-content hidden">
+            <div class="px-4 py-10 sm:px-0">
+
+                <!-- Teacher Login -->
+                <div id="teacherLogin" class="max-w-md mx-auto p-8 rounded-3xl shadow-2xl bg-gradient-to-b from-indigo-50 to-white 
+          dark:from-gray-800 dark:to-gray-900 border border-indigo-200 dark:border-gray-700 
+          transition transform hover:-translate-y-1 hover:shadow-indigo-200/50">
+
+                    <h2 class="text-2xl font-bold text-center text-indigo-700 dark:text-indigo-400 mb-8 tracking-wide">
+                        Teacher Login
+                    </h2>
+
+                    <div class="grid grid-cols-1 gap-6 sm:grid-cols-2">
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Username</label>
+                            <input type="text" id="teacherUsername" value="teacher" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl 
+                focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none transition-all 
+                bg-white dark:bg-gray-800 dark:text-white">
+                        </div>
+                        <div>
+                            <label
+                                class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
+                            <input type="password" id="teacherPassword" value="exam2024" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl 
+                focus:ring-2 focus:ring-indigo-400 focus:border-indigo-400 outline-none transition-all 
+                bg-white dark:bg-gray-800 dark:text-white">
+                        </div>
+                    </div>
+
+                    <div class="mt-8">
+                        <button onclick="teacherLogin()"
+                            class="w-full py-3 rounded-xl bg-indigo-600 text-white font-semibold hover:bg-indigo-700 transition-all shadow-md hover:shadow-lg">
+                            Login
+                        </button>
+                    </div>
+                </div>
+
+                <div id="teacherDashboard" style="display: none;">
+                    <!-- Exam Control Panel -->
+                    <div class="bg-white shadow rounded-lg mb-6">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <h3 class="text-lg font-medium text-gray-900">Exam Control Panel</h3>
+                        </div>
+                        <div class="px-6 py-4">
+                            <div class="grid grid-cols-1 gap-6 sm:grid-cols-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Exam Title</label>
+                                    <input type="text" id="examTitle" value="Distributed Systems Exam"
+                                        class="mt-1 focus:ring-primary focus:border-primary block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700">Duration (minutes)</label>
+                                    <input type="number" id="examDuration" value="2"
+                                        class="mt-1 focus:ring-primary focus:border-primary block w-full shadow-sm sm:text-sm border-gray-300 rounded-md">
+                                </div>
+                                <div class="flex items-end">
+                                    <button id="startExamBtn" onclick="startExam()"
+                                        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-secondary hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary">
+                                        Start Exam
+                                    </button>
+                                    <button id="endExamBtn" onclick="endExam()"
+                                        class="w-full flex justify-center py-2 px-4 border border-transparent rounded-md shadow-sm text-sm font-medium text-white bg-red-600 hover:bg-red-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                        style="display: none;">
+                                        End Exam
+                                    </button>
+                                </div>
+                                <div class="flex items-end">
+                                    <button onclick="downloadExcel()"
+                                        class="w-full flex justify-center py-2 px-4 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                        Download Excel
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Student Management -->
+                    <div class="bg-white shadow rounded-lg">
+                        <div class="px-6 py-4 border-b border-gray-200">
+                            <div class="flex justify-between items-center">
+                                <h3 class="text-lg font-medium text-gray-900">Completed Students</h3>
+                                <div class="flex space-x-4">
+                                    <button onclick="refreshStudentData()"
+                                        class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary">
+                                        Refresh
+                                    </button>
+                                    <button onclick="toggleEditMode()" id="editModeBtn"
+                                        class="px-3 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-accent hover:bg-yellow-600 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-accent">
+                                        Edit Marks
+                                    </button>
+                                    <button onclick="saveAllChanges()" id="saveChangesBtn"
+                                        class="px-3 py-2 border border-transparent rounded-md text-sm font-medium text-white bg-secondary hover:bg-green-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-secondary"
+                                        style="display: none;">
+                                        Save Changes
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                        <div class="px-6 py-4">
+                            <div class="overflow-x-auto">
+                                <table class="min-w-full divide-y divide-gray-200" id="studentsTable">
+                                    <thead class="bg-gray-50">
+                                        <tr>
+                                            <th
+                                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Roll No</th>
+                                            <th
+                                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Name</th>
+                                            <th
+                                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Exam Score</th>
+                                            <th
+                                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Status</th>
+                                            <th
+                                                class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">
+                                                Cheating Incidents</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody class="bg-white divide-y divide-gray-200" id="studentsTableBody">
+                                        <!-- Student data will be loaded here -->
+                                    </tbody>
+                                </table>
+                            </div>
+                            <div id="noStudents" class="text-center py-8 text-gray-500">
+                                No students have completed the exam yet. Students will appear here after submitting
+                                their exams.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- ==================== ADMIN TAB ==================== -->
+        <div id="admin" class="tab-content hidden">
+            <div id="adminLogin" class="max-w-md mx-auto mt-8 p-8 rounded-3xl shadow-2xl bg-gradient-to-b from-purple-50 to-white 
+        dark:from-gray-800 dark:to-gray-900 border border-purple-200 dark:border-gray-700 
+        transition transform hover:-translate-y-1 hover:shadow-purple-200/50">
+
+                <h2 class="text-2xl font-bold text-center text-purple-700 dark:text-purple-400 mb-8 tracking-wide">
+                    Admin Login
+                </h2>
+
+                <div class="space-y-5">
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Username</label>
+                        <input type="text" id="adminUsername" value="admin" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl 
+              focus:ring-2 focus:ring-purple-400 focus:border-purple-400 outline-none transition-all 
+              bg-white dark:bg-gray-800 dark:text-white">
+                    </div>
+
+                    <div>
+                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Password</label>
+                        <input type="password" id="adminPassword" value="admin2024" class="w-full px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-xl 
+              focus:ring-2 focus:ring-purple-400 focus:border-purple-400 outline-none transition-all 
+              bg-white dark:bg-gray-800 dark:text-white">
+                    </div>
+                </div>
+
+                <div class="mt-8">
+                    <button onclick="adminLogin()"
+                        class="w-full py-3 rounded-xl bg-purple-600 text-white font-semibold hover:bg-purple-700 transition-all shadow-md hover:shadow-lg">
+                        Login
+                    </button>
+                </div>
+            </div>
+            <div id="adminDashboard" style="display: none;">
+                <!-- System Metrics -->
+                <div class="grid grid-cols-1 gap-6 sm:grid-cols-4 mb-6">
+                    <div class="bg-white overflow-hidden shadow rounded-lg">
+                        <div class="p-5">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="w-8 h-8 bg-primary rounded-md flex items-center justify-center">
+                                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z">
+                                            </path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt class="text-sm font-medium text-gray-500 truncate">Active Students</dt>
+                                        <dd class="text-lg font-medium text-gray-900" id="activeStudentsCount">0
+                                        </dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white overflow-hidden shadow rounded-lg">
+                        <div class="p-5">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="w-8 h-8 bg-secondary rounded-md flex items-center justify-center">
+                                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt class="text-sm font-medium text-gray-500 truncate">Completed</dt>
+                                        <dd class="text-lg font-medium text-gray-900" id="completedCount">0</dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white overflow-hidden shadow rounded-lg">
+                        <div class="p-5">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="w-8 h-8 bg-red-500 rounded-md flex items-center justify-center">
+                                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt class="text-sm font-medium text-gray-500 truncate">Pending Requests</dt>
+                                        <dd class="text-lg font-medium text-gray-900" id="pendingCount">0</dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="bg-white overflow-hidden shadow rounded-lg">
+                        <div class="p-5">
+                            <div class="flex items-center">
+                                <div class="flex-shrink-0">
+                                    <div class="w-8 h-8 bg-accent rounded-md flex items-center justify-center">
+                                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor"
+                                            viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                                d="M13 10V3L4 14h7v7l9-11h-7z"></path>
+                                        </svg>
+                                    </div>
+                                </div>
+                                <div class="ml-5 w-0 flex-1">
+                                    <dl>
+                                        <dt class="text-sm font-medium text-gray-500 truncate">System Load</dt>
+                                        <dd class="text-lg font-medium text-gray-900" id="systemLoad">Normal</dd>
+                                    </dl>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- System Logs -->
+                <div class="bg-white shadow rounded-lg mb-6">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-medium text-gray-900">System Logs</h3>
+                            <div class="flex space-x-4">
+                                <select id="logServiceFilter" class="text-sm border-gray-300 rounded-md">
+                                    <option value="">All Services</option>
+                                    <option value="main">Main Server</option>
+                                    <option value="consistency">Consistency Service</option>
+                                    <option value="load_balancer">Load Balancer</option>
+                                </select>
+                                <button onclick="refreshLogs()"
+                                    class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                                    Refresh
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="px-6 py-4">
+                        <div class="log-container" id="systemLogs">
+                            <div class="text-center text-gray-500 py-4">Loading system logs...</div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Active Connections -->
+                <div class="bg-white shadow rounded-lg">
+                    <div class="px-6 py-4 border-b border-gray-200">
+                        <div class="flex justify-between items-center">
+                            <h3 class="text-lg font-medium text-gray-900">Active Connections</h3>
+                            <button onclick="refreshConnections()"
+                                class="px-3 py-2 border border-gray-300 rounded-md text-sm font-medium text-gray-700 bg-white hover:bg-gray-50">
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <div class="px-6 py-4">
+                        <div class="overflow-x-auto">
+                            <table class="min-w-full divide-y divide-gray-200">
+                                <thead class="bg-gray-50">
+                                    <tr>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                            Client ID</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                            Type</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                            Connected Since</th>
+                                        <th class="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase">
+                                            Status</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="bg-white divide-y divide-gray-200" id="connectionsTableBody">
+                                    <tr>
+                                        <td colspan="4" class="px-6 py-4 text-center text-gray-500">Loading
+                                            connections...</td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+    </main>
+
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r152/three.min.js"
+        integrity="sha512-Y+grsZfa/0Ro2fI30x7vhp9+7u+eK2Yjc+FsLJ+PzjNxUoZk1tXc2d3Q+W8oV+xfy+EubF0lU3NSLHH+2VixUw=="
+        crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+    <script>
+        let a = false;
+        document.getElementById("div_001").style.display = "none";
+        document.getElementById("btn_001").addEventListener("click", () => {
+            let x = document.getElementById("div_001");
+            if (a) {
+                x.style.display = "none";
+                a = false
+            } else {
+                x.style.display = "flex";
+                a = true;
+            }
+        })
+        // Theme toggle functionality
+        function toggleTheme() {
+            const html = document.documentElement;
+            const themeToggle = document.getElementById('themeToggle');
+            const sunIcon = document.getElementById('sunIcon');
+            const moonIcon = document.getElementById('moonIcon');
+
+            if (html.classList.contains('dark')) {
+                html.classList.remove('dark');
+                localStorage.setItem('theme', 'light');
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+            } else {
+                html.classList.add('dark');
+                localStorage.setItem('theme', 'dark');
+                sunIcon.classList.remove('hidden');
+                moonIcon.classList.add('hidden');
+            }
+        }
+
+        // Initialize theme based on user preference
+        function initTheme() {
+            const savedTheme = localStorage.getItem('theme');
+            const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+            const html = document.documentElement;
+            const sunIcon = document.getElementById('sunIcon');
+            const moonIcon = document.getElementById('moonIcon');
+
+            if (savedTheme === 'dark' || (!savedTheme && prefersDark)) {
+                html.classList.add('dark');
+                sunIcon.classList.remove('hidden');
+                moonIcon.classList.add('hidden');
+            } else {
+                html.classList.remove('dark');
+                sunIcon.classList.add('hidden');
+                moonIcon.classList.remove('hidden');
+            }
+        }
+
+        // All JavaScript code remains the same as in the original
+        // Global state
+        let currentTab = 'student';
+        let studentSessionId = '';
+        let teacherToken = '';
+        let adminToken = '';
+        let examTimer = null;
+        let studentAnswers = [];
+        let editMode = false;
+        let changedCells = new Map();
+        let websockets = {};
+        let currentScore = 0;
+
+        // WebSocket management
+        function connectWebSocket(type, identifier = '') {
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const host = window.location.host;
+            let url = `${protocol}//${host}/ws/${type}`;
+            if (identifier) url += `/${identifier}`;
+
+            const ws = new WebSocket(url);
+
+            ws.onopen = function () {
+                updateConnectionStatus('connected');
+                console.log(`${type} WebSocket connected`);
+            };
+
+            ws.onmessage = function (event) {
+                const data = JSON.parse(event.data);
+                handleWebSocketMessage(type, data);
+            };
+
+            ws.onclose = function () {
+                updateConnectionStatus('disconnected');
+                console.log(`${type} WebSocket disconnected`);
+                // Attempt to reconnect after 3 seconds
+                setTimeout(() => connectWebSocket(type, identifier), 3000);
+            };
+
+            ws.onerror = function (error) {
+                console.error(`${type} WebSocket error:`, error);
+                updateConnectionStatus('disconnected');
+            };
+
+            websockets[type] = ws;
+        }
+
+        function handleWebSocketMessage(type, data) {
+            switch (data.type) {
+                case 'heartbeat_response':
+                    // Keep connection alive
+                    break;
+                case 'status_update':
+                    if (type === 'student') {
+                        updateStudentStatus(data.data);
+                    }
+                    break;
+                case 'students_update':
+                    if (type === 'teacher') {
+                        updateStudentTable(data.data.students);
+                    }
+                    break;
+                case 'student_submitted':
+                    if (type === 'teacher') {
+                        // Refresh student data when someone submits
+                        refreshStudentData();
+                    }
+                    break;
+                case 'logs_update':
+                    if (type === 'admin') {
+                        updateSystemLogs(data.data.logs);
+                    }
+                    break;
+                case 'metrics_update':
+                    if (type === 'admin') {
+                        updateMetrics(data.data.metrics);
+                    }
+                    break;
+            }
+        }
+
+        function sendWebSocketMessage(type, message) {
+            if (websockets[type] && websockets[type].readyState === WebSocket.OPEN) {
+                websockets[type].send(JSON.stringify(message));
+            }
+        }
+
+        function updateConnectionStatus(status) {
+            const indicator = document.getElementById('connectionStatus');
+            const text = document.getElementById('connectionText');
+
+            indicator.className = 'connection-indicator ' + status;
+
+            switch (status) {
+                case 'connected':
+                    text.textContent = 'Connected';
+                    break;
+                case 'connecting':
+                    text.textContent = 'Connecting...';
+                    break;
+                case 'disconnected':
+                    text.textContent = 'Disconnected';
+                    break;
+            }
+        }
+
+        // Tab switching
+        function switchTab(tabName) {
+            // Hide all tab contents
+            document.querySelectorAll('.tab-content').forEach(content => {
+                content.classList.remove('active');
+            });
+
+            // Remove active class from all tab buttons
+            document.querySelectorAll('.tab-button').forEach(button => {
+                button.classList.remove('active');
+            });
+
+            // Show selected tab content
+            document.getElementById(tabName).classList.add('active');
+
+            // Add active class to selected tab button
+            event.target.classList.add('active');
+
+            currentTab = tabName;
+
+            // Connect appropriate WebSocket
+            switch (tabName) {
+                case 'student':
+                    if (studentSessionId) {
+                        const rollNo = document.getElementById('studentRollNo').value;
+                        connectWebSocket('student', rollNo);
+                    }
+                    break;
+                case 'teacher':
+                    if (teacherToken) {
+                        connectWebSocket('teacher');
+                        refreshStudentData();
+                    }
+                    break;
+                case 'admin':
+                    if (adminToken) {
+                        connectWebSocket('admin');
+                        refreshMetrics();
+                        refreshLogs();
+                        refreshConnections();
+                    }
+                    break;
+            }
+        }
+
+        // Student functionality
+        async function studentLogin() {
+            const rollNo = document.getElementById('studentRollNo').value;
+            const name = document.getElementById('studentName').value;
+
+            if (!rollNo || !name) {
+                alert('Please enter both roll number and name');
+                return;
+            }
+
+            try {
+                const response = await fetch('/api/student/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ roll_no: rollNo, name: name })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    studentSessionId = data.session_id;
+                    document.getElementById('studentLogin').style.display = 'none';
+                    document.getElementById('examInterface').style.display = 'block';
+
+                    // Connect WebSocket for real-time updates
+                    connectWebSocket('student', rollNo);
+
+                    // Load questions and start timer
+                    await loadExamQuestions(rollNo, data.session_id);
+                    startExamTimer(data.exam_end_time);
+                } else {
+                    alert(data.message);
+                }
+            } catch (error) {
+                console.error('Login error:', error);
+                alert('Login failed. Please try again.');
+            }
+        }
+
+
+        async function loadExamQuestions(rollNo, sessionId) {
+            try {
+                const response = await fetch(`/api/student/${rollNo}/questions?session_id=${sessionId}`);
+                const data = await response.json();
+
+                if (data.success) {
+                    displayQuestions(data.questions);
+                } else {
+                    alert('Failed to load questions');
+                }
+            } catch (error) {
+                console.error('Load questions error:', error);
+                alert('Failed to load questions');
+            }
+        }
+
+        function displayQuestions(questions) {
+            const container = document.getElementById('questionsContainer');
+            container.innerHTML = '';
+
+            questions.forEach((question, index) => {
+                const questionDiv = document.createElement('div');
+                questionDiv.className = 'question-card';
+                questionDiv.innerHTML = `
+                    <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Question ${index + 1}</h3>
+                    <p class="text-gray-700 dark:text-gray-300 mb-4">${question.text}</p>
+                    <div class="space-y-2">
+                        ${question.options.map(option => `
+                            <label class="flex items-center p-2 rounded-lg hover:bg-gray-100 dark:hover:bg-dark-600 transition-colors duration-150">
+                                <input type="radio" name="question_${question.question_id}" value="${option.charAt(0)}" class="focus:ring-primary-500 h-4 w-4 text-primary-600 border-gray-300 dark:border-dark-600">
+                                <span class="ml-3 text-gray-700 dark:text-gray-300">${option}</span>
+                            </label>
+                        `).join('')}
+                    </div>
+                `;
+                container.appendChild(questionDiv);
+            });
+        }
+
+        function startExamTimer(endTime) {
+            examTimer = setInterval(() => {
+                const now = Date.now() / 1000;
+                const remaining = Math.max(0, endTime - now);
+
+                if (remaining <= 0) {
+                    clearInterval(examTimer);
+                    autoSubmitExam();
+                    return;
+                }
+
+                const hours = Math.floor(remaining / 3600);
+                const minutes = Math.floor((remaining % 3600) / 60);
+                const seconds = Math.floor(remaining % 60);
+
+                document.getElementById('examTimer').textContent =
+                    `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+            }, 1000);
+        }
+
+        async function submitExam() {
+            const rollNo = document.getElementById('studentRollNo').value;
+            const answers = [];
+
+            // Collect answers
+            document.querySelectorAll('input[type="radio"]:checked').forEach(input => {
+                const questionId = input.name.replace('question_', '');
+                answers.push({
+                    question_id: questionId,
+                    selected_option: input.value
+                });
+            });
+
+            try {
+                const response = await fetch(`/api/student/${rollNo}/submit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: studentSessionId,
+                        answers: answers,
+                        submit_type: 'manual'
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    clearInterval(examTimer);
+                    showExamResults(data.final_score, false);
+                } else {
+                    alert(data.message);
+                }
+            } catch (error) {
+                console.error('Submit error:', error);
+                alert('Submission failed. Please try again.');
+            }
+        }
+
+        async function autoSubmitExam() {
+            // Similar to submitExam but with submit_type: 'auto'
+            const rollNo = document.getElementById('studentRollNo').value;
+            const answers = [];
+
+            document.querySelectorAll('input[type="radio"]:checked').forEach(input => {
+                const questionId = input.name.replace('question_', '');
+                answers.push({
+                    question_id: questionId,
+                    selected_option: input.value
+                });
+            });
+
+            try {
+                const response = await fetch(`/api/student/${rollNo}/submit`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        session_id: studentSessionId,
+                        answers: answers,
+                        submit_type: 'auto'
+                    })
+                });
+
+                const data = await response.json();
+                showExamResults(data.final_score || 0, true);
+            } catch (error) {
+                console.error('Auto-submit error:', error);
+                showExamResults(0, true);
+            }
+        }
+
+        function showExamResults(score, autoSubmitted = false) {
+            document.getElementById('examInterface').style.display = 'none';
+            document.getElementById('examResults').style.display = 'block';
+
+            currentScore = score;
+            const scoreElement = document.getElementById('finalScore');
+            const messageElement = document.getElementById('resultMessage');
+
+            if (autoSubmitted) {
+                scoreElement.textContent = `Time Expired - Final Score: ${score}/100`;
+                scoreElement.className = 'text-red-600 dark:text-red-500 text-2xl font-bold';
+                messageElement.textContent = 'Your exam was auto-submitted due to time expiry.';
+                messageElement.className = 'text-sm text-red-600 dark:text-red-500 mt-2';
+            } else {
+                scoreElement.textContent = `Final Score: ${score}/100`;
+                scoreElement.className = score >= 40 ? 'score-display' : 'text-red-600 dark:text-red-500 text-2xl font-bold';
+                messageElement.textContent = score >= 40 ? 'Congratulations! You passed the exam.' : 'Unfortunately, you did not reach the passing score.';
+                messageElement.className = score >= 40 ? 'text-sm text-green-600 dark:text-green-500 mt-2' : 'text-sm text-red-600 dark:text-red-500 mt-2';
+            }
+        }
+
+        // Teacher functionality
+        async function teacherLogin() {
+            const username = document.getElementById('teacherUsername').value;
+            const password = document.getElementById('teacherPassword').value;
+
+            try {
+                const response = await fetch('/api/teacher/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    teacherToken = data.token;
+                    document.getElementById('teacherLogin').style.display = 'none';
+                    document.getElementById('teacherDashboard').style.display = 'block';
+
+                    // Connect WebSocket
+                    connectWebSocket('teacher');
+
+                    // Load initial data
+                    refreshStudentData();
+                } else {
+                    alert(data.message);
+                }
+            } catch (error) {
+                console.error('Teacher login error:', error);
+                alert('Login failed. Please try again.');
+            }
+        }
+
+        async function startExam() {
+            const title = document.getElementById('examTitle').value;
+            const duration = parseInt(document.getElementById('examDuration').value);
+
+            try {
+                const response = await fetch('/api/teacher/start-exam', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        exam_title: title,
+                        duration_minutes: duration
+                    })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('startExamBtn').style.display = 'none';
+                    document.getElementById('endExamBtn').style.display = 'block';
+                    alert('Exam started successfully!');
+                } else {
+                    alert(data.message);
+                }
+            } catch (error) {
+                console.error('Start exam error:', error);
+                alert('Failed to start exam');
+            }
+        }
+
+        async function endExam() {
+            try {
+                const response = await fetch('/api/teacher/end-exam', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ session_id: 'current' })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    document.getElementById('startExamBtn').style.display = 'block';
+                    document.getElementById('endExamBtn').style.display = 'none';
+                    alert('Exam ended successfully!');
+                    refreshStudentData();
+                } else {
+                    alert(data.message);
+                }
+            } catch (error) {
+                console.error('End exam error:', error);
+                alert('Failed to end exam');
+            }
+        }
+
+        async function refreshStudentData() {
+            try {
+                const response = await fetch('/api/teacher/students');
+                const data = await response.json();
+
+                if (data.success) {
+                    updateStudentTable(data.students);
+                } else {
+                    console.error('Failed to load student data');
+                }
+            } catch (error) {
+                console.error('Refresh error:', error);
+            }
+        }
+
+        function updateStudentTable(students) {
+            const tbody = document.getElementById('studentsTableBody');
+            const noStudents = document.getElementById('noStudents');
+
+            if (!students || students.length === 0) {
+                tbody.innerHTML = '';
+                noStudents.style.display = 'block';
+                return;
+            }
+
+            noStudents.style.display = 'none';
+            tbody.innerHTML = students.map(student => `
+                <tr class="hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors duration-150">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm font-medium text-gray-900 dark:text-white">${student.roll_no}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">${student.name}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        <span class="editable-cell" data-field="exam_score" data-roll="${student.roll_no}" ${editMode ? 'contenteditable="true"' : ''}>${student.exam_score}</span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="status-badge ${getStatusBadgeClass(student.status)}">
+                            ${student.status}
+                        </span>
+                    </td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">
+                        ${student.cheating_count > 0 ? `<span class="text-red-600 dark:text-red-500 font-medium">${student.cheating_count}</span>` : '0'}
+                    </td>
+                </tr>
+            `).join('');
+
+            if (editMode) {
+                attachEditListeners();
+            }
+        }
+
+        function getStatusBadgeClass(status) {
+            switch (status) {
+                case 'active': return 'status-active';
+                case 'submitted': return 'status-submitted';
+                case 'terminated': return 'status-terminated';
+                default: return 'bg-gray-100 dark:bg-gray-800 text-gray-800 dark:text-gray-200';
+            }
+        }
+
+        function toggleEditMode() {
+            editMode = !editMode;
+            const editBtn = document.getElementById('editModeBtn');
+            const saveBtn = document.getElementById('saveChangesBtn');
+
+            if (editMode) {
+                editBtn.textContent = 'Cancel Edit';
+                editBtn.className = 'btn-primary bg-red-600 hover:bg-red-700 focus:ring-red-500';
+                saveBtn.style.display = 'block';
+
+                // Make cells editable
+                document.querySelectorAll('.editable-cell').forEach(cell => {
+                    cell.setAttribute('contenteditable', 'true');
+                });
+                attachEditListeners();
+            } else {
+                editBtn.textContent = 'Edit Marks';
+                editBtn.className = 'btn-accent';
+                saveBtn.style.display = 'none';
+
+                // Make cells non-editable
+                document.querySelectorAll('.editable-cell').forEach(cell => {
+                    cell.removeAttribute('contenteditable');
+                    cell.classList.remove('editing');
+                });
+
+                // Clear changes
+                changedCells.clear();
+                refreshStudentData();
+            }
+        }
+
+        function attachEditListeners() {
+            document.querySelectorAll('.editable-cell').forEach(cell => {
+                cell.addEventListener('focus', function () {
+                    this.classList.add('editing');
+                });
+
+                cell.addEventListener('blur', function () {
+                    this.classList.remove('editing');
+                    const roll = this.dataset.roll;
+                    const field = this.dataset.field;
+                    const value = parseInt(this.textContent) || 0;
+
+                    const key = `${roll}_${field}`;
+                    if (!changedCells.has(key)) {
+                        changedCells.set(key, { roll, field, value });
+                    } else {
+                        changedCells.get(key).value = value;
+                    }
+                });
+
+                cell.addEventListener('keypress', function (e) {
+                    // Only allow numbers
+                    if (!/[0-9]/.test(e.key) && e.key !== 'Backspace' && e.key !== 'Delete' && e.key !== 'Enter') {
+                        e.preventDefault();
+                    }
+
+                    if (e.key === 'Enter') {
+                        e.preventDefault();
+                        this.blur();
+                    }
+                });
+            });
+        }
+
+        async function saveAllChanges() {
+            if (changedCells.size === 0) {
+                alert('No changes to save');
+                return;
+            }
+
+            const saveBtn = document.getElementById('saveChangesBtn');
+            const originalText = saveBtn.textContent;
+            saveBtn.textContent = 'Saving...';
+            saveBtn.disabled = true;
+
+            try {
+                // Send updates for each student
+                for (const [key, change] of changedCells) {
+                    await fetch(`/api/teacher/student/${change.roll}/marks`, {
+                        method: 'PUT',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            exam_score: change.value,
+                            updated_by: 'teacher_web'
+                        })
+                    });
+                }
+
+                alert('All changes saved successfully!');
+                changedCells.clear();
+                toggleEditMode(); // Exit edit mode
+
+            } catch (error) {
+                console.error('Save error:', error);
+                alert('Failed to save some changes. Please try again.');
+            } finally {
+                saveBtn.textContent = originalText;
+                saveBtn.disabled = false;
+            }
+        }
+
+        async function downloadExcel() {
+            try {
+                const response = await fetch('/api/teacher/excel/download');
+
+                if (response.ok) {
+                    const blob = await response.blob();
+                    const url = window.URL.createObjectURL(blob);
+                    const a = document.createElement('a');
+                    a.style.display = 'none';
+                    a.href = url;
+                    a.download = `exam_results_${new Date().toISOString().slice(0, 10)}.xlsx`;
+                    document.body.appendChild(a);
+                    a.click();
+                    window.URL.revokeObjectURL(url);
+                    document.body.removeChild(a);
+                } else if (response.status === 404) {
+                    alert('No exam results file found. Please start an exam session first.');
+                } else {
+                    alert('Failed to download Excel file. Please try again.');
+                }
+            } catch (error) {
+                console.error('Download error:', error);
+                alert('Failed to download Excel file. Please try again.');
+            }
+        }
+
+        // Admin functionality
+        async function adminLogin() {
+            const username = document.getElementById('adminUsername').value;
+            const password = document.getElementById('adminPassword').value;
+
+            try {
+                const response = await fetch('/api/admin/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (data.success) {
+                    adminToken = data.token;
+                    document.getElementById('adminLogin').style.display = 'none';
+                    document.getElementById('adminDashboard').style.display = 'block';
+
+                    // Connect WebSocket
+                    connectWebSocket('admin');
+
+                    // Load initial data
+                    refreshMetrics();
+                    refreshLogs();
+                    refreshConnections();
+
+                    // Set up auto-refresh
+                    setInterval(refreshMetrics, 5000); // Every 5 seconds
+                    setInterval(refreshLogs, 10000); // Every 10 seconds
+                } else {
+                    alert(data.message);
+                }
+            } catch (error) {
+                console.error('Admin login error:', error);
+                alert('Login failed. Please try again.');
+            }
+        }
+
+        async function refreshMetrics() {
+            try {
+                const response = await fetch('/api/admin/metrics');
+                const data = await response.json();
+                // console.log(data);
+
+                if (data.success) {
+                    updateMetrics(data.metrics);
+                }
+            } catch (error) {
+                console.error('Metrics refresh error:', error);
+            }
+        }
+
+        function updateMetrics(metrics) {
+            document.getElementById('activeStudentsCount').textContent = metrics.active_students || 0;
+            document.getElementById('completedCount').textContent = metrics.completed_submissions || 0;
+            document.getElementById('pendingCount').textContent = metrics.pending_requests || 0;
+
+            const load = metrics.active_students > 10 ? 'High' : metrics.active_students > 5 ? 'Medium' : 'Normal';
+            document.getElementById('systemLoad').textContent = load;
+        }
+
+        async function refreshLogs() {
+            const serviceFilter = document.getElementById('logServiceFilter').value;
+
+            try {
+                const response = await fetch(`/api/admin/logs?last_n=50&service_name=${serviceFilter}`);
+                const data = await response.json();
+                console.log(data);
+                if (data.success) {
+                    updateSystemLogs(data.logs);
+                }
+            } catch (error) {
+                console.error('Logs refresh error:', error);
+            }
+        }
+
+        function updateSystemLogs(logs) {
+            const container = document.getElementById('systemLogs');
+            container.innerHTML = logs.map(log =>
+                `<div class="log-line text-xs text-gray-700 dark:text-gray-300">${escapeHtml(log)}</div>`
+            ).join('');
+
+            // Auto-scroll to bottom
+            container.scrollTop = container.scrollHeight;
+        }
+
+        async function refreshConnections() {
+            try {
+                const response = await fetch('/api/admin/connections');
+                const data = await response.json();
+
+                if (data.success) {
+                    updateConnectionsTable(data.connections);
+                }
+            } catch (error) {
+                console.error('Connections refresh error:', error);
+            }
+        }
+
+        function updateConnectionsTable(connections) {
+            const tbody = document.getElementById('connectionsTableBody');
+
+            if (!connections || connections.length === 0) {
+                tbody.innerHTML = '<tr><td colspan="4" class="px-6 py-4 text-center text-gray-500 dark:text-gray-400">No active connections</td></tr>';
+                return;
+            }
+
+            tbody.innerHTML = connections.map(conn => `
+                <tr class="hover:bg-gray-50 dark:hover:bg-dark-700 transition-colors duration-150">
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">${conn.client_id}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">${conn.connection_type}</td>
+                    <td class="px-6 py-4 whitespace-nowrap text-sm text-gray-900 dark:text-white">${new Date(conn.connected_since).toLocaleString()}</td>
+                    <td class="px-6 py-4 whitespace-nowrap">
+                        <span class="status-badge ${getStatusBadgeClass(conn.status)}">
+                            ${conn.status}
+                        </span>
+                    </td>
+                </tr>
+            `).join('');
+        }
+
+        // Utility functions
+        function escapeHtml(text) {
+            const map = {
+                '&': '&amp;',
+                '<': '&lt;',
+                '>': '&gt;',
+                '"': '&quot;',
+                "'": '&#039;'
+            };
+            return text.replace(/[&<>"']/g, function (m) { return map[m]; });
+        }
+
+        function updateStudentStatus(statusData) {
+            if (statusData.success && currentTab === 'student') {
+                // Update UI with current student status
+                console.log('Student status updated:', statusData);
+            }
+        }
+
+        // Initialize the application
+        document.addEventListener('DOMContentLoaded', function () {
+            // Initialize theme
+            initTheme();
+
+            // Set up theme toggle
+            document.getElementById('themeToggle').addEventListener('click', toggleTheme);
+
+            // Set up initial connection status
+            updateConnectionStatus('connecting');
+
+            // Add heartbeat for WebSocket connections
+            setInterval(() => {
+                Object.keys(websockets).forEach(type => {
+                    sendWebSocketMessage(type, { type: 'heartbeat' });
+                });
+            }, 30000); // Every 30 seconds
+
+            // Set up event listeners for form submissions
+            document.getElementById('studentRollNo').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') studentLogin();
+            });
+
+            document.getElementById('studentName').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') studentLogin();
+            });
+
+            document.getElementById('teacherUsername').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') teacherLogin();
+            });
+
+            document.getElementById('teacherPassword').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') teacherLogin();
+            });
+
+            document.getElementById('adminUsername').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') adminLogin();
+            });
+
+            document.getElementById('adminPassword').addEventListener('keypress', function (e) {
+                if (e.key === 'Enter') adminLogin();
+            });
+
+            // Set up service filter change listener
+            document.getElementById('logServiceFilter').addEventListener('change', refreshLogs);
+
+            console.log('Distributed Exam System initialized');
+        });
+
+        // Handle page unload
+        window.addEventListener('beforeunload', function () {
+            Object.values(websockets).forEach(ws => {
+                if (ws.readyState === WebSocket.OPEN) {
+                    ws.close();
+                }
+            });
+        });
+    </script>
+</body>
+
+</html>
